@@ -88,7 +88,7 @@ class ServerTests(unittest.TestCase):
 
     def test_lan(self):
         self.preview.stop()
-        with patch("unity_webgl_launcher.server.lan_addresses", return_value=["192.168.1.2"]):
+        with patch("unity_webgl_launcher.server.lan_addresses", return_value=["192.168.1.2"]), patch("socket.getfqdn", side_effect=AssertionError("Server startup must not wait for DNS")):
             self.preview.start(str(self.root), lan=True)
         self.assertEqual(self.preview.server.server_address[0], "0.0.0.0")
         self.assertTrue(self.preview.phone_urls[0].startswith("http://192.168.1.2:"))

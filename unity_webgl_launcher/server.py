@@ -8,6 +8,7 @@ from pathlib import Path
 import re
 import shutil
 import socket
+from socketserver import TCPServer
 import subprocess
 import sys
 import threading
@@ -45,6 +46,12 @@ class WebGLServer(ThreadingHTTPServer):
     block_on_close = False
     allow_reuse_address = sys.platform != "win32"
     request_queue_size = 32
+
+    def server_bind(self):
+        # HTTPServer normally performs reverse DNS here. The preview needs only
+        # the numeric address; offline/VPN/macOS DNS must not delay startup.
+        TCPServer.server_bind(self)
+        self.server_name, self.server_port = self.server_address[:2]
 
     def __init__(self, root: Path, entry: str, host: str, port: int):
         self.root = root.resolve(strict=True)

@@ -1,0 +1,12 @@
+/Unity_WebGL_Удобный_запуск/
+/Unity_WebGL_macOS/
+/*.zip
+/.venv/
+/build/
+/dist/
+/release/
+__pycache__/
+*.py[cod]
+*.spec
+.DS_Store
+/scratch/

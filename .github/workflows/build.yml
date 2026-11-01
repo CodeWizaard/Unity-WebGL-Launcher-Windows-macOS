@@ -1,0 +1,63 @@
+name: Build desktop apps
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            label: windows-x64
+          - os: macos-15-intel
+            label: macos-x64
+          - os: macos-15
+            label: macos-arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install build tools
+        run: python -m pip install -r requirements-build.txt
+      - name: Test HTTP server
+        run: python -m unittest discover -s tests -v
+      - name: Build native app
+        run: python scripts/build.py
+      - name: Test packaged app
+        run: python scripts/check_bundle.py
+      - name: Package with license and checksum
+        run: python scripts/package.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Unity-WebGL-Launcher-${{ matrix.label }}
+          path: release/*
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: gh release create "$RELEASE_TAG" release/* --title "Unity WebGL Launcher $RELEASE_TAG" --notes-file docs/release-notes.md --verify-tag

@@ -1,0 +1,9 @@
+[project]
+name = "unity-webgl-launcher"
+version = "1.0.0"
+description = "A simple Windows and macOS desktop launcher for Unity WebGL builds"
+requires-python = ">=3.10"
+license = "MIT"
+
+[tool.ruff]
+line-length = 120

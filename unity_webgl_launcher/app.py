@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import tkinter as tk
+from pathlib import Path
+import sys
 from tkinter import filedialog, messagebox, ttk
 import webbrowser
 
@@ -13,6 +15,12 @@ class Launcher:
         self.window = window
         self.preview = Preview()
         window.title("Unity WebGL Launcher")
+        assets = Path(__file__).with_name("assets")
+        if sys.platform == "win32":
+            window.iconbitmap(default=str(assets / "launcher.ico"))
+        else:
+            self.icon = tk.PhotoImage(file=str(assets / "launcher.png"))
+            window.iconphoto(True, self.icon)
         window.geometry("680x470")
         window.minsize(620, 470)
         window.protocol("WM_DELETE_WINDOW", self.close)
@@ -127,6 +135,9 @@ class Launcher:
 
 
 def main():
+    if sys.platform == "win32":
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("CodeWizaard.UnityWebGLLauncher")
     window = tk.Tk()
     Launcher(window)
     window.mainloop()

@@ -6,6 +6,17 @@ from pathlib import Path
 import sys
 from tkinter import filedialog, messagebox, ttk
 import webbrowser
+import threading
+import tempfile
+import os
+
+try:
+    import qrcode
+    from PIL import Image, ImageTk
+except ImportError:
+    qrcode = None
+    Image = None
+    ImageTk = None
 
 from .server import Preview
 
@@ -21,8 +32,8 @@ class Launcher:
         else:
             self.icon = tk.PhotoImage(file=str(assets / "launcher.png"))
             window.iconphoto(True, self.icon)
-        window.geometry("680x470")
-        window.minsize(620, 470)
+        window.geometry("680x550")
+        window.minsize(620, 520)
         window.protocol("WM_DELETE_WINDOW", self.close)
         self.path = tk.StringVar()
         self.mode = tk.StringVar(value="local")
@@ -63,8 +74,16 @@ class Launcher:
         self.address_box.grid(row=0, column=0, sticky="ew")
         self.copy_button = ttk.Button(address_row, text="Копировать", command=self.copy, state="disabled")
         self.copy_button.grid(row=0, column=1, padx=(8, 0))
+        
+        self.qr_frame = ttk.Frame(frame)
+        self.qr_frame.grid(row=8, sticky="w", pady=(8, 10))
+        self.qr_code_label = ttk.Label(self.qr_frame, text="QR-код для телефона")
+        self.qr_code_label.pack(side="left")
+        self.qr_image_label = ttk.Label(self.qr_frame)
+        self.qr_image_label.pack(side="left", padx=10)
+
         self.note_label = ttk.Label(frame, textvariable=self.note, wraplength=605, justify="left")
-        self.note_label.grid(row=8, sticky="ew")
+        self.note_label.grid(row=9, sticky="ew")
         frame.bind("<Configure>", lambda event: self.note_label.configure(wraplength=max(300, event.width - 48)))
 
     def choose_file(self):
@@ -86,6 +105,7 @@ class Launcher:
             self.set_running(False)
             self.status.set("Остановлено")
             self.address.set("")
+            self.qr_image_label.config(image="")
             self.mode_changed()
             return
         try:
@@ -100,9 +120,33 @@ class Launcher:
         self.copy_button.configure(state="normal" if addresses else "disabled")
         self.status.set("Работает · адрес для телефона" if self.mode.get() == "lan" else "Работает · адрес на этом компьютере")
         self.mode_changed()
+        
         if self.mode.get() == "lan" and not addresses:
             self.status.set("Работает · сетевой адрес не найден")
             self.note.set("Подключитесь к Wi-Fi и запустите снова. На этом компьютере билд уже доступен через кнопку «Открыть в браузере».")
+        else:
+            if addresses and qrcode and Image:
+                url = addresses[0]
+                try:
+                    qr = qrcode.QRCode(version=1, box_size=1, border=1)
+                    qr.add_data(url)
+                    qr.make(fit=True)
+                    img = qr.make_image(fill_color="black", back_color="white").convert('RGB')
+                    
+                    # Use temporary file to display image if ImageTk is not available
+                    if ImageTk:
+                        self.qr_image_label.config(image=ImageTk.PhotoImage(img))
+                    else:
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
+                            img.save(tmp.name)
+                            # We need to keep a reference to the photo
+                            self.temp_qr_photo = tk.PhotoImage(file=tmp.name)
+                            self.qr_image_label.config(image=self.temp_qr_photo)
+                except Exception as e:
+                    print(f"Failed to generate QR code: {e}")
+            else:
+                self.qr_image_label.config(image="")
+
         self.open_browser()
 
     def set_running(self, running: bool):
@@ -113,6 +157,7 @@ class Launcher:
         if not running:
             self.address_box.configure(state="disabled", values=[])
             self.copy_button.configure(state="disabled")
+            self.qr_image_label.config(image="")
 
     def open_browser(self):
         if self.preview.running:

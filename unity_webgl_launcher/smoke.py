@@ -47,9 +47,14 @@ def run(report_path: str) -> int:
                     app.toggle()
                 assert app.address.get().startswith("http://192.168.1.2:")
                 assert app.preview.server.server_address[0] == "0.0.0.0"
+                window.update()
+                assert app.qr_photo is not None
+                assert app.qr_photo.width() >= 174
+                assert str(app.qr_photo) in tuple(map(str, window.tk.splitlist(app.qr_image_label.cget("image"))))
+                assert str(app.qr_photo) in window.tk.call("image", "names")
                 app.toggle()
                 assert not app.preview.running
-            result = {"ok": True, "checks": ["Tk window", "start", "gzip WASM", "copy address", "stop", "LAN restart"]}
+            result = {"ok": True, "checks": ["Tk window", "start", "gzip WASM", "copy address", "stop", "LAN restart", "QR image in packaged app"]}
     except Exception:
         result["error"] = traceback.format_exc()
     finally:

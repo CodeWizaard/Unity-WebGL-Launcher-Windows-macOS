@@ -1,4 +1,4 @@
-"""Native, single-window UI. No third-party runtime dependencies."""
+"""Native, single-window UI. QR codes for phone previews."""
 from __future__ import annotations
 
 import tkinter as tk
@@ -6,17 +6,8 @@ from pathlib import Path
 import sys
 from tkinter import filedialog, messagebox, ttk
 import webbrowser
-import threading
-import tempfile
-import os
-
-try:
-    import qrcode
-    from PIL import Image, ImageTk
-except ImportError:
-    qrcode = None
-    Image = None
-    ImageTk = None
+import qrcode
+from PIL import ImageTk
 
 from .server import Preview
 
@@ -32,8 +23,8 @@ class Launcher:
         else:
             self.icon = tk.PhotoImage(file=str(assets / "launcher.png"))
             window.iconphoto(True, self.icon)
-        window.geometry("680x550")
-        window.minsize(620, 520)
+        window.geometry("680x740")
+        window.minsize(620, 720)
         window.protocol("WM_DELETE_WINDOW", self.close)
         self.path = tk.StringVar()
         self.mode = tk.StringVar(value="local")
@@ -72,15 +63,18 @@ class Launcher:
         address_row.columnconfigure(0, weight=1)
         self.address_box = ttk.Combobox(address_row, textvariable=self.address, state="disabled")
         self.address_box.grid(row=0, column=0, sticky="ew")
+        self.address_box.bind("<<ComboboxSelected>>", self.update_qr)
         self.copy_button = ttk.Button(address_row, text="Копировать", command=self.copy, state="disabled")
         self.copy_button.grid(row=0, column=1, padx=(8, 0))
         
+        self.qr_photo = None
         self.qr_frame = ttk.Frame(frame)
         self.qr_frame.grid(row=8, sticky="w", pady=(8, 10))
         self.qr_code_label = ttk.Label(self.qr_frame, text="QR-код для телефона")
         self.qr_code_label.pack(side="left")
         self.qr_image_label = ttk.Label(self.qr_frame)
         self.qr_image_label.pack(side="left", padx=10)
+        self.qr_frame.grid_remove()
 
         self.note_label = ttk.Label(frame, textvariable=self.note, wraplength=605, justify="left")
         self.note_label.grid(row=9, sticky="ew")
@@ -105,7 +99,7 @@ class Launcher:
             self.set_running(False)
             self.status.set("Остановлено")
             self.address.set("")
-            self.qr_image_label.config(image="")
+            self.update_qr()
             self.mode_changed()
             return
         try:
@@ -124,30 +118,26 @@ class Launcher:
         if self.mode.get() == "lan" and not addresses:
             self.status.set("Работает · сетевой адрес не найден")
             self.note.set("Подключитесь к Wi-Fi и запустите снова. На этом компьютере билд уже доступен через кнопку «Открыть в браузере».")
-        else:
-            if addresses and qrcode and Image:
-                url = addresses[0]
-                try:
-                    qr = qrcode.QRCode(version=1, box_size=1, border=1)
-                    qr.add_data(url)
-                    qr.make(fit=True)
-                    img = qr.make_image(fill_color="black", back_color="white").convert('RGB')
-                    
-                    # Use temporary file to display image if ImageTk is not available
-                    if ImageTk:
-                        self.qr_image_label.config(image=ImageTk.PhotoImage(img))
-                    else:
-                        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
-                            img.save(tmp.name)
-                            # We need to keep a reference to the photo
-                            self.temp_qr_photo = tk.PhotoImage(file=tmp.name)
-                            self.qr_image_label.config(image=self.temp_qr_photo)
-                except Exception as e:
-                    print(f"Failed to generate QR code: {e}")
-            else:
-                self.qr_image_label.config(image="")
+        self.update_qr()
 
         self.open_browser()
+
+    def update_qr(self, event=None):
+        self.qr_image_label.configure(image="")
+        self.qr_photo = None
+        self.qr_frame.grid_remove()
+        if not self.preview.running or self.mode.get() != "lan" or not self.address.get():
+            return
+        try:
+            qr = qrcode.QRCode(box_size=6, border=4)
+            qr.add_data(self.address.get())
+            qr.make(fit=True)
+            image = qr.make_image(fill_color="black", back_color="white").convert("RGB")
+            self.qr_photo = ImageTk.PhotoImage(image, master=self.window)
+            self.qr_image_label.configure(image=self.qr_photo)
+            self.qr_frame.grid()
+        except Exception as error:
+            messagebox.showerror("Ошибка QR-кода", f"Не удалось создать QR-код:\n{error}", parent=self.window)
 
     def set_running(self, running: bool):
         self.toggle_button.configure(text="Остановить" if running else "Запустить")
@@ -157,7 +147,7 @@ class Launcher:
         if not running:
             self.address_box.configure(state="disabled", values=[])
             self.copy_button.configure(state="disabled")
-            self.qr_image_label.config(image="")
+            self.update_qr()
 
     def open_browser(self):
         if self.preview.running:

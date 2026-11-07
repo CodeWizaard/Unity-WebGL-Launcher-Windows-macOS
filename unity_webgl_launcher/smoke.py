@@ -43,12 +43,19 @@ def run(report_path: str) -> int:
                 app.toggle()
                 assert not app.preview.running
                 app.mode.set("lan")
-                with patch("unity_webgl_launcher.server.lan_addresses", return_value=["192.168.1.2"]):
+                with patch("unity_webgl_launcher.server.lan_addresses", return_value=["192.168.1.2", "10.0.0.2"]):
                     app.toggle()
                 assert app.address.get().startswith("http://192.168.1.2:")
                 assert app.preview.server.server_address[0] == "0.0.0.0"
+                assert "Все ссылки открывают один билд" in app.note.get()
+                first_qr = app.qr_photo
+                app.address_box.current(1)
+                app.address_box.event_generate("<<ComboboxSelected>>")
+                app.copy()
+                assert window.clipboard_get().startswith("http://10.0.0.2:")
                 window.update()
                 assert app.qr_photo is not None
+                assert app.qr_photo is not first_qr
                 assert app.qr_photo.width() >= 174
                 assert str(app.qr_photo) in tuple(map(str, window.tk.splitlist(app.qr_image_label.cget("image"))))
                 assert str(app.qr_photo) in window.tk.call("image", "names")

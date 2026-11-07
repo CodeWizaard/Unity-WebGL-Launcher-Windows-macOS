@@ -91,7 +91,20 @@ class Launcher:
             self.path.set(value)
 
     def mode_changed(self):
-        self.note.set("Телефон и компьютер должны быть в одной сети. Для телефона используйте Gzip или Decompression Fallback. Многопоточность требует HTTPS. Папка доступна сети до остановки." if self.mode.get() == "lan" else "Откроется в вашем обычном браузере. Установка сервера не нужна.")
+        if self.mode.get() == "local":
+            self.note.set("Откроется в вашем обычном браузере. Установка сервера не нужна.")
+            return
+        note = "Телефон и компьютер должны быть в одной сети."
+        if len(self.preview.phone_urls) > 1:
+            note += (
+                " Все ссылки открывают один билд по разным IP-адресам компьютера"
+                " (Wi-Fi, Ethernet или VPN). Если первая ссылка не открывается на телефоне,"
+                " выберите другую. QR-код и кнопка «Копировать» используют выбранную ссылку."
+            )
+        self.note.set(
+            note + "\nДля телефона используйте Gzip или Decompression Fallback."
+            " Многопоточность требует HTTPS. Папка доступна сети до остановки."
+        )
 
     def toggle(self):
         if self.preview.running:
